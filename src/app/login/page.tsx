@@ -9,20 +9,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
     setSuccess(null);
     setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
     const action = isRegister ? register : login;
+
     const result = await action(formData);
+
     if (result?.error) {
       setError(result.error);
+      setLoading(false);
+      return;
     }
     if (result && "success" in result) {
       setSuccess(result.success as string);
       setIsRegister(false);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // If no result returned, redirect happened — keep loading state
   }
 
   return (
@@ -87,7 +97,7 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form action={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
                 htmlFor="email"
