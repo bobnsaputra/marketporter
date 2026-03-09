@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { login, register } from "./actions";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,22 +19,23 @@ export default function LoginPage() {
 
     const formData = new FormData(e.currentTarget);
     const action = isRegister ? register : login;
-
     const result = await action(formData);
 
-    if (result?.error) {
+    if (result.error) {
       setError(result.error);
       setLoading(false);
       return;
     }
-    if (result && "success" in result) {
-      setSuccess(result.success as string);
+
+    if ("confirm" in result) {
+      setSuccess(result.confirm as string);
       setIsRegister(false);
       setLoading(false);
       return;
     }
 
-    // If no result returned, redirect happened — keep loading state
+    // Success — navigate to dashboard
+    router.push("/dashboard");
   }
 
   return (

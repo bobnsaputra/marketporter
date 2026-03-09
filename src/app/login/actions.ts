@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function login(formData: FormData) {
@@ -19,7 +18,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  return { success: "ok" };
 }
 
 export async function register(formData: FormData) {
@@ -38,16 +37,16 @@ export async function register(formData: FormData) {
 
   // If email confirmation is required, user won't have a session yet
   if (signUpData.user && !signUpData.session) {
-    return { success: "Account created! Check your email to confirm, then sign in." };
+    return { confirm: "Account created! Check your email to confirm, then sign in." };
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  return { success: "ok" };
 }
 
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login");
+  return { success: "ok" };
 }

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { logout } from "@/app/login/actions";
+import LogoutButton from "@/components/LogoutButton";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -16,14 +16,7 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold">MarketPorter</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm text-zinc-400">{user.email}</span>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="text-sm text-zinc-400 hover:text-white transition-colors"
-            >
-              Sign out
-            </button>
-          </form>
+          <LogoutButton />
         </div>
       </header>
       <main className="p-6">
