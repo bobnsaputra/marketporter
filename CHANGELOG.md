@@ -12,3 +12,15 @@
 - Cleaned up old Next.js files, added .gitignore
 - Fixed .env.local for Vite compatibility
 - Verified dev server running at http://localhost:5173/
+ - Added bulk link paste/import UI (`LinkBulkInput`)
+ - Persisted theme preference to `localStorage` (mp-theme)
+ - Switched app font to Inter for a modern look
+ - Modernized navbar and dashboard visuals (gradient logo, centered title)
+ - Reworked theme toggle to a compact sliding control
+ - Updated placeholder examples to `jp.mercari.com`
+ - Sign-out button now shows red on hover
+ - Restored `/users` route and fixed `UsersPage` import/duplicates
+ - Added shared `Layout` component so navbar appears on protected pages
+ - Navbar title is now context-aware (shows current page; hover reveals the other page)
+ - Simplified dropdown to a single-word hover item with fade/slide animation and 150ms close delay for easy clicking
+ - Users page updated to follow light/dark theme reliably (reads `mp-theme`, observes `dark` class) and uses theme-aware text/background classes
