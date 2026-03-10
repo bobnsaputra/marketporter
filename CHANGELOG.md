@@ -24,3 +24,7 @@
  - Navbar title is now context-aware (shows current page; hover reveals the other page)
  - Simplified dropdown to a single-word hover item with fade/slide animation and 150ms close delay for easy clicking
  - Users page updated to follow light/dark theme reliably (reads `mp-theme`, observes `dark` class) and uses theme-aware text/background classes
+ - Added customer workflow: `CustomerModal`, Add button, and `customers` migration (local insert + Supabase wiring)
+ - Customer modal modernized for light/dark; currency switched to IDR (`Rp`) and inputs use whole-IDR by default
+ - `UsersPage` now fetches customers from Supabase, shows created time and user snippet, and includes a modern search with debounce
+ - Dashboard updated to display a customers list beside the bulk import area
