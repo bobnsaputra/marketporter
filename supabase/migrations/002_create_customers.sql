@@ -4,6 +4,7 @@ create table public.customers (
   id text primary key,
   user_id uuid references public.profiles(id) on delete set null,
   name text not null,
+  rate integer not null default 130,
   amount numeric(12,2) not null,
   description text,
   created_at timestamptz default now()

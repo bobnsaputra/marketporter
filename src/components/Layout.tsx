@@ -102,17 +102,19 @@ export default function Layout() {
               </button>
 
               <div className={`absolute left-0 top-full mt-1 z-50 transition-opacity transition-transform duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
-                <button
-                  onClick={() => {
+                <a
+                  href={altPath}
+                  onClick={(e) => {
+                    e.preventDefault();
                     setOpen(false);
                     navigate && navigate(altPath);
                   }}
-                  className={`text-lg font-semibold inline-flex items-center gap-2 px-2 py-1 transition-colors ${
+                  className={`text-lg font-semibold inline-flex items-center gap-2 px-2 py-1 transition-colors cursor-pointer ${
                     theme === "dark" ? "text-white" : "text-zinc-900"
                   } ${theme === "dark" ? "hover:text-white/90" : "hover:text-zinc-800"}`}
                 >
                   {altTitle}
-                </button>
+                </a>
               </div>
             </div>
           </div>

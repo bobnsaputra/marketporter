@@ -3,7 +3,7 @@ import { useState } from "react";
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { id: string; name: string; amount: number; description?: string }) => void;
+  onSave: (data: { id: string; name: string; amount: number; description?: string; rate?: number }) => void;
   isDark?: boolean;
 };
 
@@ -11,6 +11,7 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [rate, setRate] = useState<string>("130");
 
   if (!open) return null;
 
@@ -18,13 +19,14 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
     if (!name || !amount) return; // require name and amount
     const id = Date.now().toString(36);
     const num = Number(amount.toString().replace(/[^0-9.\-]/g, "")) || 0;
-    onSave({ id, name, amount: num, description: description || undefined });
+    const rateNum = Number(String(rate).replace(/[^0-9.\-]/g, "")) || 130;
+    onSave({ id, name, amount: num, description: description || undefined, rate: rateNum });
     // reset
     setName("");
     setAmount("");
     setDescription("");
+    setRate("130");
   }
-
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -67,7 +69,7 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
             </label>
 
             <label className="block">
-              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>Amount transferred</span>
+              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>Amount (IDR)</span>
               <div className="mt-1 relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">Rp</span>
                 <input
@@ -82,14 +84,27 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
             </label>
 
             <label className="block">
+              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>Rate (JPY → IDR)</span>
+              <input
+                type="number"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                placeholder="130"
+                className={`mt-1 block w-full rounded-lg border border-zinc-200 bg-white/60 dark:bg-transparent px-3 py-2 shadow-sm focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-indigo-600 text-white' : 'focus:ring-indigo-200 text-zinc-900'}`}
+              />
+            </label>
+
+            <label className="block">
               <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>Description</span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional notes"
+                placeholder="Address/Notes"
                 className={`mt-1 block w-full rounded-lg border border-zinc-200 bg-white/60 dark:bg-transparent px-3 py-2 min-h-[88px] shadow-sm focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-indigo-600 text-white' : 'focus:ring-indigo-200 text-zinc-900'}`}
               />
             </label>
+
+            
           </div>
         </div>
 

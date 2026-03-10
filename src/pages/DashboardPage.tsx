@@ -3,7 +3,7 @@ import LinkBulkInput from "@/components/LinkBulkInput";
 import Select from "@/components/Select";
 import { supabase } from "@/lib/supabase";
 
-type Customer = { id: string; name: string };
+type Customer = { id: string; name: string; rate?: number };
 
 export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -13,7 +13,7 @@ export default function DashboardPage() {
     let mounted = true;
     async function load() {
       try {
-        const { data, error } = await supabase.from("customers").select("id, name").order("created_at", { ascending: false }).limit(50);
+        const { data, error } = await supabase.from("customers").select("id, name, rate").order("created_at", { ascending: false }).limit(50);
         if (error) throw error;
         if (!mounted) return;
         setCustomers((data ?? []) as Customer[]);
@@ -45,7 +45,7 @@ export default function DashboardPage() {
       <div className="mt-6 max-w-2xl mx-auto">
         <h3 className="text-lg font-medium">Bulk import links</h3>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Paste a list of product links to create orders in bulk.</p>
-        <LinkBulkInput onImport={handleImportLinks} detectedRight={detectedRight} />
+        <LinkBulkInput onImport={handleImportLinks} detectedRight={detectedRight} customerRate={customers.find((c) => c.id === selectedCustomer)?.rate} />
       </div>
     </div>
   );

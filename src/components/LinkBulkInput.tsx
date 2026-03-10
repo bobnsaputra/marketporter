@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 
-export default function LinkBulkInput({ onImport, detectedRight }: { onImport?: (links: string[]) => void; detectedRight?: React.ReactNode }) {
+export default function LinkBulkInput({ onImport, detectedRight, customerRate }: { onImport?: (links: string[]) => void; detectedRight?: React.ReactNode; customerRate?: number }) {
   const [text, setText] = useState("");
   const [isDark, setIsDark] = useState(false);
   const [showInvalid, setShowInvalid] = useState(false);
 
-  // Ensure the detectedRight node adapts to the current theme by cloning it with theme classes when it's a React element
+  // Ensure the detectedRight node adapts to the current theme by cloning it and merging className when it's a React element
   const renderDetectedRight = (() => {
     if (!detectedRight) return null;
     if (React.isValidElement(detectedRight)) {
       const themeClass = isDark ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-white text-zinc-900 border-zinc-200';
-      return React.cloneElement(detectedRight as React.ReactElement, { className: themeClass } as any);
+      const existing = (detectedRight as any).props?.className || "";
+      const merged = [existing, themeClass].filter(Boolean).join(' ');
+      return React.cloneElement(detectedRight as React.ReactElement, { className: merged } as any);
     }
     return detectedRight;
   })();
@@ -43,13 +45,43 @@ export default function LinkBulkInput({ onImport, detectedRight }: { onImport?: 
       .filter((line) => isValidHttpUrl(line));
   }
 
-  const links = parseLinks(text);
-  const allLines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-  const invalidLines = allLines.filter((l) => !isValidHttpUrl(l));
+  const links = useMemo(() => parseLinks(text), [text]);
+  const allLines = useMemo(() => text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean), [text]);
+  const invalidLines = useMemo(() => allLines.filter((l) => !isValidHttpUrl(l)), [allLines]);
+
+  // previews are no longer enriched; we only use the raw links as the preview
+  const [rate, setRate] = useState<number>(() => {
+    const v = localStorage.getItem('mp-rate');
+    return v ? Number(v) : 1500;
+  });
+  const [rateInput, setRateInput] = useState<string>(() => localStorage.getItem('mp-rate') || '1500');
+
+  // If a customer-specific rate is provided, prefer showing/using it as the effective rate
+  const effectiveRate = customerRate ?? rate;
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'mp-rate') setRate(e.newValue ? Number(e.newValue) : 1500);
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  function saveRate() {
+    const n = Number(rateInput) || 0;
+    localStorage.setItem('mp-rate', String(n));
+    setRate(n);
+  }
+
+  // no-op: previews aren't fetched/enriched anymore; the UI uses `links` directly
+
+  // No automatic preview fetching: scraping third-party pages is disabled
 
   function handleImport() {
-    const parsed = parseLinks(text);
-    if (onImport) onImport(parsed);
+    const toImport = links;
+    if (onImport) onImport(toImport);
+    const ev = new CustomEvent('linkbulk:import', { detail: toImport });
+    window.dispatchEvent(ev);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -112,7 +144,18 @@ export default function LinkBulkInput({ onImport, detectedRight }: { onImport?: 
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {typeof customerRate === 'number' && (
+              <div className={`w-36 ${isDark ? 'text-zinc-300' : 'text-zinc-600'} text-sm`}>
+                {typeof customerRate === 'number' ? (
+                  <>Rate: <span className="font-medium">{customerRate}</span></>
+                ) : (
+                  <div aria-hidden className="invisible">placeholder</div>
+                )}
+              </div>
+          )}
+
+          <div className="flex items-center gap-2">
           {invalidLines.length > 0 && (
             <div className="flex items-center gap-2">
               <button
@@ -141,6 +184,7 @@ export default function LinkBulkInput({ onImport, detectedRight }: { onImport?: 
           </button>
         </div>
       </div>
+      </div>
 
       {showInvalid && invalidLines.length > 0 && (
         <div className={`mt-3 rounded-md p-3 border ${isDark ? 'border-zinc-700 bg-zinc-900 text-white' : 'border-zinc-100 bg-white text-zinc-900'}`}>
@@ -161,6 +205,35 @@ export default function LinkBulkInput({ onImport, detectedRight }: { onImport?: 
           </ul>
         </div>
       )}
+
+      {links.length > 0 && (
+        <div className={`mt-4 rounded-md p-3 border ${isDark ? 'border-zinc-700 bg-zinc-900 text-white' : 'border-zinc-100 bg-white text-zinc-900'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium">Previews</div>
+            <div className="text-xs text-zinc-500">Detected links to import</div>
+          </div>
+          <div className="overflow-auto max-h-48">
+            <ul className="space-y-2 text-sm">
+              {links.map((l) => (
+                <li key={l} className="truncate">
+                  <a href={l} target="_blank" rel="noreferrer" className={`${isDark ? 'text-white hover:underline' : 'text-indigo-600 hover:underline'}`}>{l}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={handleImport}
+          disabled={links.length === 0}
+          className={`rounded-md px-5 py-2 text-sm font-semibold text-white shadow ${isDark ? 'bg-green-500 hover:bg-green-600' : 'bg-green-600 hover:bg-green-700'}`}
+        >
+          Confirm
+        </button>
+      </div>
     </section>
   );
 }

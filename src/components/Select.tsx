@@ -32,7 +32,7 @@ export default function Select({ value, onChange, options, className = "" }: Pro
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${base} ${theme} w-full`}
+        className={`${base} ${theme} w-full cursor-pointer`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value} className={isDark ? "bg-zinc-900 text-white" : "bg-white text-zinc-900"}>
