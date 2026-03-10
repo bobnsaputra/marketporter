@@ -1,11 +1,9 @@
-"use client";
-
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { login, register } from "./actions";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,24 +16,31 @@ export default function LoginPage() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const action = isRegister ? register : login;
-    const result = await action(formData);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-      return;
-    }
-
-    if ("confirm" in result) {
-      setSuccess(result.confirm as string);
+    if (isRegister) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+      setSuccess("Account created! You can now sign in.");
       setIsRegister(false);
       setLoading(false);
-      return;
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+      navigate("/dashboard");
     }
-
-    // Success — navigate to dashboard
-    router.push("/dashboard");
   }
 
   return (
@@ -47,29 +52,36 @@ export default function LoginPage() {
             <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
               <span className="text-white font-bold text-sm">MP</span>
             </div>
-            <span className="text-lg font-semibold text-white">MarketPorter</span>
+            <span className="text-lg font-semibold text-white">
+              MarketPorter
+            </span>
           </div>
         </div>
 
         <div className="space-y-6">
           <h2 className="text-4xl font-bold leading-tight text-white">
-            JP Marketplace<br />
-            Buying Service<br />
+            JP Marketplace
+            <br />
+            Buying Service
+            <br />
             Manager
           </h2>
           <p className="text-zinc-400 max-w-sm leading-relaxed">
-            Organize orders, track purchases, and manage customers — all from Japanese marketplaces to worldwide delivery.
+            Organize orders, track purchases, and manage customers — all from
+            Japanese marketplaces to worldwide delivery.
           </p>
           <div className="flex items-center gap-3 text-sm">
-            <span className="px-3 py-1.5 rounded-full border border-zinc-800 text-zinc-400 bg-zinc-900/50">Mercari</span>
-            <span className="px-3 py-1.5 rounded-full border border-zinc-800 text-zinc-400 bg-zinc-900/50">PayPay Flea Market</span>
+            <span className="px-3 py-1.5 rounded-full border border-zinc-800 text-zinc-400 bg-zinc-900/50">
+              Mercari
+            </span>
+            <span className="px-3 py-1.5 rounded-full border border-zinc-800 text-zinc-400 bg-zinc-900/50">
+              PayPay Flea Market
+            </span>
             <span className="text-zinc-600">& more</span>
           </div>
         </div>
 
-        <p className="text-xs text-zinc-600">
-          🇯🇵 Japan → 🌏 Worldwide
-        </p>
+        <p className="text-xs text-zinc-600">🇯🇵 Japan → 🌏 Worldwide</p>
       </div>
 
       {/* Right side — login form */}
@@ -81,7 +93,9 @@ export default function LoginPage() {
               <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
                 <span className="text-white font-bold text-sm">MP</span>
               </div>
-              <span className="text-lg font-semibold text-white">MarketPorter</span>
+              <span className="text-lg font-semibold text-white">
+                MarketPorter
+              </span>
             </div>
             <p className="mt-3 text-sm text-zinc-500">
               JP Marketplace Buying Service Manager
@@ -138,7 +152,9 @@ export default function LoginPage() {
                 placeholder="••••••••"
               />
               {isRegister && (
-                <p className="mt-1.5 text-xs text-zinc-600">Must be at least 6 characters</p>
+                <p className="mt-1.5 text-xs text-zinc-600">
+                  Must be at least 6 characters
+                </p>
               )}
             </div>
 
@@ -160,18 +176,28 @@ export default function LoginPage() {
               className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 hover:shadow-indigo-600/30 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {loading
-                ? (isRegister ? "Creating account..." : "Signing in...")
-                : (isRegister ? "Create account" : "Sign in")}
+                ? isRegister
+                  ? "Creating account..."
+                  : "Signing in..."
+                : isRegister
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 
           {/* Toggle login/register */}
           <div className="text-center">
             <p className="text-sm text-zinc-500">
-              {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
+              {isRegister
+                ? "Already have an account?"
+                : "Don't have an account?"}{" "}
               <button
                 type="button"
-                onClick={() => { setIsRegister(!isRegister); setError(null); setSuccess(null); }}
+                onClick={() => {
+                  setIsRegister(!isRegister);
+                  setError(null);
+                  setSuccess(null);
+                }}
                 className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
               >
                 {isRegister ? "Sign in" : "Register"}

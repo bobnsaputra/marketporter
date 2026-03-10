@@ -4,15 +4,15 @@
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router) |
+| Frontend | Vite + React |
 | Language | TypeScript |
+| Routing | React Router |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth |
 | File Storage | Supabase Storage |
 | Real-time | Supabase Realtime |
 | Styling | Tailwind CSS |
-| Scraping | Next.js API routes + Cheerio / Puppeteer |
-| Deployment | Vercel + Supabase Cloud |
+| Deployment | Vercel / Netlify + Supabase Cloud |
 
 ---
 
