@@ -131,33 +131,29 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
         placeholder={"https://jp.mercari.com/item/123\nhttps://jp.mercari.com/item/456"}
       />
 
-      <div className="mt-4 flex items-center gap-4">
-        <div className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-          Detected: <span className={`font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>{links.length}</span>
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+            Detected: <span className={`font-medium ${isDark ? 'text-white' : 'text-zinc-900'}`}>{links.length}</span>
+          </div>
+
+          {/* desktop: show selector centered; mobile: hidden (shown below) */}
+          <div className="hidden sm:block flex-shrink-0 w-56">
+            {renderDetectedRight && <div className="w-full">{renderDetectedRight}</div>}
+          </div>
         </div>
 
-        <div className="flex-1 flex justify-center">
-          {renderDetectedRight ? (
-            <div className="w-52">
-              {renderDetectedRight}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {typeof customerRate === 'number' && (
-              <div className={`w-36 ${isDark ? 'text-zinc-300' : 'text-zinc-600'} text-sm`}>
-                {typeof customerRate === 'number' ? (
-                  <>Rate: <span className="font-medium">{customerRate}</span></>
-                ) : (
-                  <div aria-hidden className="invisible">placeholder</div>
-                )}
-              </div>
-          )}
+        <div className="flex items-center gap-3 justify-end">
+          <div className={`w-36 ${isDark ? 'text-zinc-300' : 'text-zinc-600'} text-sm`}>
+            {typeof customerRate === 'number' ? (
+              <>Rate: <span className="font-medium">{customerRate}</span></>
+            ) : (
+              <div aria-hidden className="invisible">placeholder</div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
-          {invalidLines.length > 0 && (
-            <div className="flex items-center gap-2">
+            {invalidLines.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowInvalid((s) => !s)}
@@ -165,25 +161,31 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
               >
                 Invalid: {invalidLines.length}
               </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => { navigator.clipboard.writeText(text || links.join("\n")); }}
-            className={`text-sm px-3 py-1 rounded-md transition ${isDark ? 'text-zinc-300 hover:text-white hover:bg-zinc-800' : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'}`}
-          >
-            Copy
-          </button>
-          <button
-            type="button"
-            onClick={handleImport}
-            disabled={links.length === 0}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isDark ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-          >
-            Import links
-          </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { navigator.clipboard.writeText(text || links.join("\n")); }}
+              className={`text-sm px-3 py-1 rounded-md transition ${isDark ? 'text-zinc-300 hover:text-white hover:bg-zinc-800' : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'}`}
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={links.length === 0}
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isDark ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            >
+              Import links
+            </button>
+          </div>
         </div>
-      </div>
+
+        {/* mobile: show selector underneath to avoid crowding */}
+        {renderDetectedRight && (
+          <div className="sm:hidden mt-2">
+            {renderDetectedRight}
+          </div>
+        )}
       </div>
 
       {showInvalid && invalidLines.length > 0 && (
