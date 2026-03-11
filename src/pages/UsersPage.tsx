@@ -125,10 +125,7 @@ export default function UsersPage() {
 		setEditingData(null);
 	}
 
-	function handleCancelEdit() {
-		setEditingId(null);
-		setEditingData(null);
-	}
+ 
 
 	return (
 		<div className="min-h-full">

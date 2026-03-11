@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ConfigPage() {
   const [rate, setRate] = useState<string>(() => localStorage.getItem('mp-rate') || '1500');
