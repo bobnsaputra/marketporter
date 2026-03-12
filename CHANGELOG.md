@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-12
+
+- Aligned columns in the bulk link import UI so `Price (JPY)`, `Slabbed` checkbox and `Price (IDR)` cells line up correctly in `LinkBulkInput`.
+- Replaced native `title` tooltips with a modern styled hover tooltip showing the IDR calculation (JPY × rate, plus slab fee when applied).
+
 ## 2026-03-10
 
 - Migrated project from Next.js to Vite + React + TypeScript
