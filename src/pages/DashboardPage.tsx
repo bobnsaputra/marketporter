@@ -8,6 +8,7 @@ type Customer = { id: string; name: string; rate?: number };
 export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -23,13 +24,27 @@ export default function DashboardPage() {
       }
     }
     load();
+    // load current user id for association
+    (async () => {
+      try {
+        if (supabase?.auth?.getUser) {
+          const res = await supabase.auth.getUser();
+          setCurrentUserId((res?.data as any)?.user?.id ?? null);
+        } else if ((supabase.auth as any)?.user && typeof (supabase.auth as any).user === 'function') {
+          const u = (supabase.auth as any).user();
+          setCurrentUserId(u?.id ?? null);
+        }
+      } catch (e) {
+        console.warn('Failed to get current user id', e);
+      }
+    })();
     return () => { mounted = false; };
   }, []);
 
-  function handleImportLinks(links: string[]) {
+  function handleSaveLinks(links: string[]) {
     // include selected customer context
-    console.log("Importing links for customer:", selectedCustomer, links);
-    // TODO: wire to create orders or queue scraper with customer id
+    console.log("Saving links for customer:", selectedCustomer, links);
+    // TODO: wire to create orders or queue saver with customer id
   }
 
   const detectedRight = (
@@ -43,9 +58,9 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mt-6 max-w-2xl mx-auto">
-        <h3 className="text-lg font-medium">Bulk import links</h3>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Paste a list of product links to create orders in bulk.</p>
-        <LinkBulkInput onImport={handleImportLinks} detectedRight={detectedRight} customerRate={customers.find((c) => c.id === selectedCustomer)?.rate} />
+        <h3 className="text-lg font-medium">Bulk saves</h3>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">Paste a list of product links to save orders in bulk.</p>
+        <LinkBulkInput currentUserId={currentUserId ?? undefined} customerId={selectedCustomer ?? undefined} onSave={handleSaveLinks} detectedRight={detectedRight} customerRate={customers.find((c) => c.id === selectedCustomer)?.rate} />
       </div>
     </div>
   );

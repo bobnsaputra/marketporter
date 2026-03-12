@@ -4,6 +4,13 @@
 
 - Aligned columns in the bulk link import UI so `Price (JPY)`, `Slabbed` checkbox and `Price (IDR)` cells line up correctly in `LinkBulkInput`.
 - Replaced native `title` tooltips with a modern styled hover tooltip showing the IDR calculation (JPY × rate, plus slab fee when applied).
+ - Implemented manual-only bulk-paste import (`LinkBulkInput`): one http(s) link per line, per-link JPY input, and IDR calculation using the selected customer's rate plus optional slab fee.
+ - Persist confirmed imports locally (`mp-imported-cards`) and persist slab fee to `mp-slab-fee` in `localStorage` for better UX.
+ - Added robust Supabase save flow: client-generated `id` on insert, preflight `SELECT` to detect exact existing links, insert-only for new rows, and `upsert` fallback on duplicate-key errors. Per-item `exists` flags surface duplicates in the UI.
+ - Centralized `supabase` client import and included `user_id`, `customer_id`, and integer `rate_used` in inserted `orders` rows.
+ - Added `Orders` page: lists server-saved orders grouped by customer/created_at, shows totals, and supports per-row inline-editable status and bulk status updates.
+ - Improved Orders filters: searchable customer dropdown and timeframe pill selectors (Any, Today, This week, This month, 2h/4h/6h options).
+ - Instrumented diagnostics for update calls that return no rows: when `.update(...).select()` returns empty we now surface a clear message recommending checking Supabase Row Level Security (RLS) or permissions and perform a safe refetch/fallback.
 
 ## 2026-03-10
 

@@ -33,9 +33,8 @@ export default function Layout() {
   const closeTimeoutRef = useRef<number | null>(null);
   const location = useLocation();
   const isUsers = location.pathname.startsWith("/users");
-  const primaryTitle = isUsers ? "Customer" : "Dashboard";
-  const altTitle = isUsers ? "Dashboard" : "Customer";
-  const altPath = isUsers ? "/dashboard" : "/users";
+  const isOrders = location.pathname.startsWith("/orders");
+  const primaryTitle = isOrders ? "Orders" : isUsers ? "Customer" : "Dashboard";
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -102,19 +101,28 @@ export default function Layout() {
               </button>
 
               <div className={`absolute left-0 top-full mt-1 z-50 transition-opacity transition-transform duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
-                <a
-                  href={altPath}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setOpen(false);
-                    navigate && navigate(altPath);
-                  }}
-                  className={`text-lg font-semibold inline-flex items-center gap-2 px-2 py-1 transition-colors cursor-pointer ${
-                    theme === "dark" ? "text-white" : "text-zinc-900"
-                  } ${theme === "dark" ? "hover:text-white/90" : "hover:text-zinc-800"}`}
-                >
-                  {altTitle}
-                </a>
+                <div className="flex flex-col">
+                  {[
+                    { path: '/dashboard', label: 'Dashboard' },
+                    { path: '/orders', label: 'Orders' },
+                    { path: '/users', label: 'Customer' },
+                  ].map((item) => (
+                    <a
+                      key={item.path}
+                      href={item.path}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setOpen(false);
+                        navigate && navigate(item.path);
+                      }}
+                      className={`text-lg font-semibold inline-flex items-center gap-2 px-2 py-1 transition-colors cursor-pointer ${
+                        theme === "dark" ? "text-white" : "text-zinc-900"
+                      } ${theme === "dark" ? "hover:text-white/90" : "hover:text-zinc-800"}`}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

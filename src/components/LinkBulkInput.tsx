@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import ReactDOM from 'react-dom';
+import { supabase } from "../lib/supabase";
 
-export default function LinkBulkInput({ onImport, detectedRight, customerRate }: { onImport?: (links: string[]) => void; detectedRight?: React.ReactNode; customerRate?: number }) {
+export default function LinkBulkInput({ onSave, detectedRight, customerRate, currentUserId, customerId }: { onSave?: (links: string[]) => void; detectedRight?: React.ReactNode; customerRate?: number; currentUserId?: string; customerId?: string }) {
   const [text, setText] = useState("");
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
   const [showInvalid, setShowInvalid] = useState(false);
   const [attemptedConfirm, setAttemptedConfirm] = useState(false);
@@ -65,6 +67,31 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
   const [slabbed, setSlabbed] = useState<Record<string, boolean>>({});
   const [hoverTooltip, setHoverTooltip] = useState<{ text: string; rect: DOMRect } | null>(null);
   const hideTimeoutRef = useRef<number | null>(null);
+  const [importedCards, setImportedCards] = useState<any[]>([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmItems, setConfirmItems] = useState<any[] | null>(null);
+
+  // load persisted cards from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mp-imported-cards');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setImportedCards(parsed.map((c) => ({ ...c })));
+      }
+    } catch (err) {
+      console.warn('Failed to parse persisted imported cards', err);
+    }
+  }, []);
+
+  // persist cards to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('mp-imported-cards', JSON.stringify(importedCards));
+    } catch (err) {
+      console.warn('Failed to persist imported cards', err);
+    }
+  }, [importedCards]);
 
   function handlePriceChange(url: string, val: string) {
     setPrices((p) => ({ ...p, [url]: val }));
@@ -97,12 +124,11 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
 
   // No automatic preview fetching: scraping third-party pages is disabled
 
-  function handleImport() {
+  function handleSaveClick() {
     setAttemptedConfirm(true);
     // prevent confirm if any JPY price missing
     const missing = links.filter((url) => !prices[url] || String(prices[url]).trim() === "");
     if (missing.length > 0) return;
-
     const enriched = links.map((url) => ({
       url,
       price_jpy: prices[url] ?? null,
@@ -110,11 +136,52 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
       slab_fee_amount: slabbed[url] ? slabFee : 0,
       price_idr: calcIdrFor(url),
     }));
-    // keep legacy onImport signature (urls array)
-    if (onImport) onImport(links);
-    const ev = new CustomEvent('linkbulk:import', { detail: enriched });
-    window.dispatchEvent(ev);
+
+    // show confirmation modal before saving
+    setConfirmItems(enriched);
+    setShowConfirmModal(true);
+  }
+
+  function cancelConfirm() {
+    setShowConfirmModal(false);
+    setConfirmItems(null);
     setAttemptedConfirm(false);
+  }
+
+  async function confirmSave() {
+    if (!confirmItems) return;
+    const enriched = confirmItems;
+    const createdAt = new Date().toISOString();
+    const card = {
+      id: String(Date.now()) + Math.random().toString(36).slice(2, 7),
+      createdAt,
+      user: 'local',
+      customer_id: customerId ?? null,
+      items: enriched.map((it) => ({ ...it })),
+      history: [{ createdAt, items: enriched.map((it) => ({ ...it })) }],
+      supabaseStatus: 'pending',
+    };
+    setImportedCards((c) => [card, ...c]);
+    setAttemptedConfirm(false);
+
+    // clear preview inputs now that they are moved into a card
+    setText('');
+    setPrices({});
+    setSlabbed({});
+    setShowInvalid(false);
+
+    // keep legacy onSave signature (urls array)
+    if (onSave) onSave(enriched.map((i) => i.url));
+    const ev = new CustomEvent('linkbulk:save', { detail: enriched });
+    window.dispatchEvent(ev);
+
+    // close modal
+    setShowConfirmModal(false);
+    setConfirmItems(null);
+
+    // attempt to save to Supabase for the new card
+    // pass the card object directly (avoids stale state closure issues)
+    setTimeout(() => handleSaveCardToSupabase(card), 50);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -122,6 +189,143 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
     // Allow default paste then normalize state (we'll append)
     setText((prev) => (prev ? prev + "\n" + pasted : pasted));
     e.preventDefault();
+  }
+
+  function recomputeItem(it: any) {
+    const j = it.price_jpy;
+    if (!j || typeof customerRate !== 'number') return { ...it, price_idr: null };
+    const n = Number(String(j).replace(/[¥,\s]/g, '')) || 0;
+    const base = Math.round(n * customerRate);
+    const slabAmt = it.slabbed ? slabFee : 0;
+    return { ...it, price_idr: base + slabAmt };
+  }
+
+  function handleUpdateCard(id: string, next: any) {
+    setImportedCards((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const items = (next.items || []).map(recomputeItem);
+      return { ...c, ...next, items };
+    }));
+  }
+
+  function handleSaveCard(id: string) {
+    setImportedCards((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const snapshot = { createdAt: new Date().toISOString(), items: c.items.map((it: any) => ({ ...it })) };
+      const hist = c.history ? [snapshot, ...c.history] : [snapshot];
+      return { ...c, history: hist };
+    }));
+  }
+
+  async function handleSaveCardToSupabase(idOrCard: string | any) {
+    const card = typeof idOrCard === 'string' ? importedCards.find((c) => c.id === idOrCard) : idOrCard;
+    if (!card) return;
+    // prevent re-saving if already saved or currently saving
+    if (card.supabaseStatus === 'saving' || card.supabaseStatus === 'saved') {
+      console.warn('Skipping save: card already saving/saved', card.id, card.supabaseStatus);
+      return;
+    }
+    const id = card.id;
+    setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'saving' } : c));
+    if (!supabase) {
+      // no supabase client configured
+      console.warn('No Supabase client found (supabase import)');
+      setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'no-client' } : c));
+      return;
+    }
+    try {
+      const client = supabase;
+      // prefer provided currentUserId prop, fall back to client auth if absent
+      let user_id: string | null = currentUserId ?? null;
+      if (!user_id) {
+        try {
+          if (client?.auth?.getUser) {
+            const u = await client.auth.getUser();
+            user_id = (u?.data as any)?.user?.id ?? null;
+          } else if ((client.auth as any)?.user && typeof (client.auth as any).user === 'function') {
+            const uu = (client.auth as any).user();
+            user_id = uu?.id ?? null;
+          }
+        } catch (_) {
+          user_id = null;
+        }
+      }
+
+      const rows = card.items.map((it: any) => {
+        const genId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : (`id_${Date.now()}_${Math.random().toString(36).slice(2,6)}`);
+        return {
+          id: genId,
+          link: it.url,
+          user_id: user_id,
+          customer_id: customerId ?? null,
+          price_jpy: it.price_jpy ? Number(String(it.price_jpy).replace(/[^0-9.-]/g, '')) : null,
+          price_idr: it.price_idr ?? null,
+          slabbed: !!it.slabbed,
+          rate_used: typeof customerRate === 'number' ? Math.round(customerRate) : null,
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      // Preflight: check for exact existing links to avoid unique-constraint 409s
+      const incomingLinks = rows.map((r: any) => r.link);
+      let existingExact: any[] = [];
+      try {
+        const { data: selData, error: selErr } = await client.from('orders').select('id,link').in('link', incomingLinks);
+        if (selErr) {
+          console.warn('Preflight select error', selErr);
+        } else {
+          existingExact = Array.isArray(selData) ? selData : [];
+        }
+      } catch (e) {
+        // ignore preflight failure — we'll attempt insert and handle errors below
+        console.warn('Preflight select exception', e);
+      }
+
+      const existingLinkSet = new Set(existingExact.map((r: any) => r.link));
+      const rowsToInsert = rows.filter((r: any) => !existingLinkSet.has(r.link));
+
+      if (rowsToInsert.length === 0) {
+        // nothing to insert — mark saved and attach existing ids
+        const existingIds = existingExact.map((r: any) => r.id);
+        const existingSet = new Set(existingExact.map((r: any) => r.link));
+        // mark items that already exist so UI can show alerts per-item
+        setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'saved', supabaseData: existingExact, supabaseInsertedIds: existingIds, items: c.items.map((it:any)=> ({ ...it, exists: existingSet.has(it.url) })) } : c));
+        try { setAlertMsg(`Saved ${existingIds.length} items (already existed)`); setTimeout(() => setAlertMsg(null), 3500); } catch {};
+        return;
+      }
+
+      // Attempt insert; on duplicate-key error, fall back to upsert on 'link'
+      const { data, error } = await client.from('orders').insert(rowsToInsert);
+      if (error) {
+        const msg = String(error?.message || '');
+        const isDup = error?.code === '23505' || /duplicate key/i.test(msg) || /unique constraint/i.test(msg);
+        if (isDup) {
+          // try upsert on link (will update existing rows)
+          const { data: upsertData, error: upErr } = await client.from('orders').upsert(rowsToInsert, { onConflict: 'link' });
+          if (upErr) throw upErr;
+          const upIds = Array.isArray(upsertData) ? (upsertData as any[]).map((r: any) => r.id) : [];
+          setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'saved', supabaseData: upsertData, supabaseInsertedIds: upIds } : c));
+          try { setAlertMsg(`Saved ${upIds.length} items (upsert)`); setTimeout(() => setAlertMsg(null), 3500); } catch {};
+          return;
+        }
+        throw error;
+      }
+
+      // success
+      const insertedIds = (Array.isArray(data) ? data : []).map((r: any) => (r as any).id);
+      // mark items that were inserted (those in rowsToInsert) as not-exists
+      const insertedLinkSet = new Set(rowsToInsert.map((r:any)=>r.link));
+      setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'saved', supabaseData: data, supabaseInsertedIds: insertedIds, items: c.items.map((it:any)=> ({ ...it, exists: !insertedLinkSet.has(it.url) ? false : false })) } : c));
+      try { setAlertMsg(`Saved ${rowsToInsert.length} items`); setTimeout(() => setAlertMsg(null), 3500); } catch {};
+    } catch (err: any) {
+      console.error('Supabase save error', err);
+      let errText = '';
+      try {
+        if (err?.message) errText = `${err.message} ${JSON.stringify(err)}`;
+        else errText = JSON.stringify(err);
+      } catch (e) { errText = String(err); }
+      setImportedCards((prev) => prev.map((c) => c.id === id ? { ...c, supabaseStatus: 'error', supabaseError: errText } : c));
+    }
   }
 
   useEffect(() => {
@@ -224,7 +428,7 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
           </div>
 
           {/* desktop: show selector centered; mobile: hidden (shown below) */}
-          <div className="hidden sm:block flex-shrink-0 w-56">
+          <div className="hidden sm:block flex-shrink-0 w-45">
             {renderDetectedRight && <div className="w-full">{renderDetectedRight}</div>}
           </div>
         </div>
@@ -371,7 +575,7 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
           <div className="flex justify-end">
         <button
           type="button"
-          onClick={handleImport}
+          onClick={handleSaveClick}
             disabled={links.length === 0}
           className={`rounded-md px-5 py-2 text-sm font-semibold text-white shadow ${isDark ? 'bg-green-500 hover:bg-green-600' : 'bg-green-600 hover:bg-green-700'}`}
         >
@@ -380,6 +584,27 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
           </div>
         </div>
     </section>
+    {showConfirmModal && typeof document !== 'undefined' && ReactDOM.createPortal(
+      <div className="fixed inset-0 z-60 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40" onClick={cancelConfirm} />
+        <div className={`relative z-50 w-full max-w-md rounded-md p-4 ${isDark ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-white text-zinc-900 border border-zinc-100'}`}>
+            <div className="text-sm font-medium mb-2">Confirm save</div>
+          <div className="text-sm mb-4">You're about to save <span className="font-medium">{confirmItems?.length ?? 0}</span> items. This will save them now.</div>
+          <div className="flex justify-end gap-2">
+            <button onClick={cancelConfirm} className={`px-3 py-1 rounded ${isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-zinc-200'}`}>Cancel</button>
+            <button onClick={confirmSave} className={`px-3 py-1 rounded ${isDark ? 'bg-green-500 text-white' : 'bg-green-600 text-white'}`}>Confirm</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    {/* Editable cards for confirmed imports */}
+    {importedCards.length > 0 && (
+        <div className="mt-6">
+          <EditableCards cards={importedCards} onUpdate={handleUpdateCard} isDark={isDark} />
+        </div>
+    )}
+
     {hoverTooltip && typeof document !== 'undefined' && ReactDOM.createPortal(
       (() => {
         const TIP_W = 224; // matches w-56
@@ -405,7 +630,79 @@ export default function LinkBulkInput({ onImport, detectedRight, customerRate }:
       })(),
       document.body
     )}
+    {alertMsg && typeof document !== 'undefined' && ReactDOM.createPortal(
+      <div className="fixed top-6 right-6 z-60">
+        <div className="rounded-md px-4 py-2 bg-green-600 text-white shadow">{alertMsg}</div>
+      </div>,
+      document.body
+    )}
     </>
+  );
+}
+
+// mount EditableCards inside main component by reading state; to avoid circular hooks, we'll export default remains unchanged
+
+// Rendered editable cards UI helper functions (below)
+
+function formatShort(dt?: string) {
+  if (!dt) return '';
+  try {
+    const d = new Date(dt);
+    return d.toLocaleString();
+  } catch {
+    return dt;
+  }
+}
+
+export function EditableCards({ cards, onUpdate, isDark }: { cards: any[]; onUpdate: (id: string, next: any) => void; isDark?: boolean }) {
+  return (
+    <div className="mt-4 space-y-4">
+      {cards.map((card) => (
+        <div key={card.id} className={`border rounded-md p-3 ${isDark ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-zinc-900 border-zinc-100'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium">Order: {formatShort(card.createdAt)} — {card.user}</div>
+            <div className="text-xs text-zinc-500">Items: {card.items.length}</div>
+          </div>
+          <div className="space-y-2">
+            {card.items.map((it: any, idx: number) => (
+              <div key={it.url + idx} className="flex items-center gap-3">
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <a href={it.url} className={`truncate ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}>{it.url}</a>
+                  {it.exists ? (
+                    <span title="Already exists" className="text-red-500 text-xs">⚠</span>
+                  ) : null}
+                </div>
+                {card.supabaseStatus === 'saved' ? (
+                  <div className={`w-24 rounded px-2 py-1 text-sm ${isDark ? 'bg-transparent text-white' : 'bg-transparent text-zinc-900'}`}>{it.price_jpy ?? ''}</div>
+                ) : (
+                  <input value={it.price_jpy ?? ''} onChange={(e) => onUpdate(card.id, { ...card, items: card.items.map((x:any,i:number)=> i===idx ? { ...x, price_jpy: e.target.value } : x) })} className={`w-24 rounded px-2 py-1 text-sm border ${isDark ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-200'}`} />
+                )}
+                <label className="flex items-center gap-1">
+                  <input type="checkbox" checked={!!it.slabbed} disabled={card.supabaseStatus === 'saved'} onChange={(e) => onUpdate(card.id, { ...card, items: card.items.map((x:any,i:number)=> i===idx ? { ...x, slabbed: e.target.checked } : x) })} />
+                  <span className="text-xs">Slab</span>
+                </label>
+                <div className="w-36 text-right text-sm">{it.price_idr ? `Rp ${it.price_idr.toLocaleString('id-ID')}` : '—'}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-end gap-2">
+            {card.supabaseStatus === 'error' ? (
+              <div className="text-xs px-2 py-1 rounded bg-red-600 text-white">Error</div>
+            ) : null}
+          </div>
+          {card.history && card.history.length > 0 && (
+            <div className={`mt-3 text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              History:
+              <ul className="mt-1 space-y-1">
+                {card.history.map((h:any, i:number) => (
+                  <li key={i}>{formatShort(h.createdAt)} — {h.items.length} items</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
