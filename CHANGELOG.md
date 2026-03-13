@@ -12,6 +12,14 @@
  - Improved Orders filters: searchable customer dropdown and timeframe pill selectors (Any, Today, This week, This month, 2h/4h/6h options).
  - Instrumented diagnostics for update calls that return no rows: when `.update(...).select()` returns empty we now surface a clear message recommending checking Supabase Row Level Security (RLS) or permissions and perform a safe refetch/fallback.
 
+## 2026-03-13
+
+- Polished the Orders page layout and spacing for improved readability and alignment.
+- Moved the group-level select-all checkbox into a column-aligned header row so it vertically aligns with per-item checkboxes and columns (`Link`, `Price (JPY)`, `Price (IDR)`, `Select`).
+- Updated timeframe filters: renamed "Day" to "This day" and added a `24h` option (plus 2h/4h/6h pills); pill styles now follow light/dark theme.
+- Made the header dropdown (Dashboard / Orders / Customer) theme-aware with a matching background, border, and hover states so long labels remain readable in both themes.
+- Made the customer search dropdown and input on the Orders page follow light/dark backgrounds and borders to avoid visual dilution of long text.
+
 ## 2026-03-10
 
 - Migrated project from Next.js to Vite + React + TypeScript

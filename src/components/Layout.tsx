@@ -101,7 +101,7 @@ export default function Layout() {
               </button>
 
               <div className={`absolute left-0 top-full mt-1 z-50 transition-opacity transition-transform duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
-                <div className="flex flex-col">
+                <div className={`flex flex-col rounded-md overflow-hidden shadow-lg ${theme === 'dark' ? 'bg-zinc-900 text-white border border-zinc-700' : 'bg-white text-zinc-900 border border-zinc-100'}`}>
                   {[
                     { path: '/dashboard', label: 'Dashboard' },
                     { path: '/orders', label: 'Orders' },
@@ -115,9 +115,7 @@ export default function Layout() {
                         setOpen(false);
                         navigate && navigate(item.path);
                       }}
-                      className={`text-lg font-semibold inline-flex items-center gap-2 px-2 py-1 transition-colors cursor-pointer ${
-                        theme === "dark" ? "text-white" : "text-zinc-900"
-                      } ${theme === "dark" ? "hover:text-white/90" : "hover:text-zinc-800"}`}
+                      className={`text-sm font-medium block w-full truncate px-3 py-2 transition-colors cursor-pointer ${theme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'}`}
                     >
                       {item.label}
                     </a>

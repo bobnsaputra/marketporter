@@ -119,10 +119,10 @@ export default function OrdersPage() {
   return (
     <div className="mt-6 max-w-4xl mx-auto">
       <h3 className="text-lg font-medium">Orders</h3>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">Orders fetched from Supabase, grouped by customer and creation time.</p>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">List of orders based on filter.</p>
 
       <div className="mt-4 space-y-6">
-        {loading && <div className="text-sm text-zinc-500">Loading…</div>}
+        {/* hide inline loading label to avoid pushing cards (use spinner/overlay if needed) */}
         {error && <div className="text-sm text-red-600">{error}</div>}
         {!loading && keys.length === 0 && <div className="text-sm text-zinc-500">No orders found.</div>}
 
@@ -135,13 +135,13 @@ export default function OrdersPage() {
                 onChange={(e) => { setCustomerQuery(e.target.value); setShowCustomerDropdown(true); }}
                 onFocus={() => setShowCustomerDropdown(true)}
                 placeholder="Search customers"
-                className="text-sm rounded border px-3 py-1 w-48"
+                className={`text-sm rounded border px-3 py-1 w-48 ${isDark ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-zinc-900 border-zinc-200'}`}
               />
               {showCustomerDropdown && (
-                <div className="absolute z-40 mt-1 w-56 max-h-48 overflow-auto rounded border bg-white text-sm shadow-lg">
-                  <div className={`px-2 py-1 cursor-pointer hover:bg-zinc-100 ${filterCustomerId === 'all' ? 'font-semibold' : ''}`} onMouseDown={() => { setFilterCustomerId('all'); setCustomerQuery(''); setShowCustomerDropdown(false); }}>All customers</div>
+                <div className={`absolute z-40 mt-1 w-56 max-h-48 overflow-auto rounded shadow-lg ${isDark ? 'bg-zinc-900 text-white border border-zinc-700' : 'bg-white text-sm text-zinc-900 border border-zinc-100'}`}>
+                  <div className={`px-2 py-1 cursor-pointer ${isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'} ${filterCustomerId === 'all' ? 'font-semibold' : ''}`} onMouseDown={() => { setFilterCustomerId('all'); setCustomerQuery(''); setShowCustomerDropdown(false); }}>All customers</div>
                   {customersList.filter(c => !customerQuery || c.name?.toLowerCase().includes(customerQuery.toLowerCase()) || c.id.includes(customerQuery)).slice(0,50).map(c => (
-                    <div key={c.id} className={`px-2 py-1 cursor-pointer hover:bg-zinc-100 ${filterCustomerId === c.id ? 'font-semibold' : ''}`} onMouseDown={() => { setFilterCustomerId(c.id); setCustomerQuery(''); setShowCustomerDropdown(false); }}>{c.name || c.id}</div>
+                    <div key={c.id} className={`px-2 py-1 cursor-pointer ${isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'} ${filterCustomerId === c.id ? 'font-semibold' : ''}`} onMouseDown={() => { setFilterCustomerId(c.id); setCustomerQuery(''); setShowCustomerDropdown(false); }}>{c.name || c.id}</div>
                   ))}
                   {customersList.length === 0 && <div className="px-2 py-1 text-zinc-500">No customers</div>}
                 </div>
@@ -152,14 +152,15 @@ export default function OrdersPage() {
             <div className="flex items-center gap-1">
               {[
                 ['any','Any'],
-                ['today','Day'],
+                ['today','This day'],
                 ['this_week','Week'],
                 ['this_month','Month'],
+                ['24h','24h'],
                 ['2h','2h'],
                 ['4h','4h'],
                 ['6h','6h'],
               ].map(([val, label]) => (
-                <button key={String(val)} onClick={() => setTimeFilter(String(val))} className={`text-xs px-2 py-1 rounded ${timeFilter===val ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-800'}`}>
+                <button key={String(val)} onClick={() => setTimeFilter(String(val))} className={`text-xs px-2 py-1 rounded ${timeFilter===val ? 'bg-indigo-600 text-white' : (isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-100 text-zinc-800')}`}>
                   {label}
                 </button>
               ))}
@@ -171,7 +172,9 @@ export default function OrdersPage() {
                 <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="text-sm rounded border px-2 py-1">
                   <option value="pending">pending</option>
                   <option value="processed">processed</option>
+                  <option value="arrived">arrived</option>
                   <option value="shipped">shipped</option>
+                  <option value="completed">completed</option>
                   <option value="cancelled">cancelled</option>
                 </select>
                 <button
@@ -219,12 +222,18 @@ export default function OrdersPage() {
           const total = items.reduce((acc: number, it: any) => acc + (Number(it.price_idr) || 0), 0);
           return (
             <div key={key}>
-              <div className="text-sm font-semibold mb-2">Customer: {customerName}</div>
-              <div className="space-y-3">
-                <div className={`border rounded-md p-3 ${isDark ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-zinc-900 border-zinc-100'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm">Created: {formatShort(createdAt)}</div>
-                    <div className="flex items-center gap-3">
+                <div className="space-y-3">
+                  <div className={`border rounded-md p-3 ${isDark ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-zinc-900 border-zinc-100'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm">{formatShort(createdAt)}</div>
+                      <div className="text-sm font-semibold text-center flex-1 truncate">{customerName}</div>
+                      <div className="text-xs text-zinc-500">{items.length} items • Total: Rp {total.toLocaleString('id-ID')}</div>
+                    </div>
+                  <div className="flex items-center gap-3 text-sm font-medium border-b pb-2 mb-3">
+                    <div className="flex-1">Link</div>
+                    <div className="w-28 text-right">Price (JPY)</div>
+                    <div className="w-36 text-right">Price (IDR)</div>
+                    <div className="w-40 text-right flex items-center justify-start gap-2">
                       <input type="checkbox" aria-label="Select all" checked={items.every((it:any)=> !!selectedIds[it.id])} onChange={(e)=>{
                         const checked = !!e.target.checked;
                         setSelectedIds((s) => {
@@ -233,14 +242,14 @@ export default function OrdersPage() {
                           return out;
                         });
                       }} />
-                      <div className="text-xs text-zinc-500">{items.length} items • Total: Rp {total.toLocaleString('id-ID')}</div>
+                      <div className="text-xs text-zinc-500">Select</div>
                     </div>
                   </div>
                   <div className="space-y-1 text-sm">
                     {items.map((it: any, idx: number) => (
                       <div key={it.id ?? idx} className="flex items-center gap-3">
                         <a href={it.link} target="_blank" rel="noreferrer" className={`flex-1 ${isDark ? 'text-indigo-300' : 'text-indigo-600'} truncate`}>{it.link}</a>
-                        <div className="w-28 text-right">{it.price_jpy ?? '—'}</div>
+                        <div className="w-28 text-right">¥ {it.price_jpy ?? '—'}</div>
                         <div className="w-36 text-right">{it.price_idr ? `Rp ${it.price_idr.toLocaleString('id-ID')}` : '—'}</div>
                         <div className="w-40 text-right flex items-center gap-2">
                           <input type="checkbox" checked={!!selectedIds[it.id]} onChange={(e) => setSelectedIds((s) => ({ ...s, [it.id]: !!e.target.checked }))} />
@@ -271,11 +280,13 @@ export default function OrdersPage() {
                             }} onBlur={() => setEditingStatusId(null)} className="text-sm rounded border px-2 py-1">
                               <option value="pending">pending</option>
                               <option value="processed">processed</option>
+                              <option value="arrived">arrived</option>
                               <option value="shipped">shipped</option>
+                              <option value="completed">completed</option>
                               <option value="cancelled">cancelled</option>
                             </select>
                           ) : (
-                            <div onClick={() => setEditingStatusId(it.id)} className={`cursor-pointer text-xs px-2 py-1 rounded ${it.status === 'processed' ? 'bg-emerald-600 text-white' : it.status === 'shipped' ? 'bg-blue-600 text-white' : it.status === 'cancelled' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{it.status ?? 'pending'}</div>
+                            <div onClick={() => setEditingStatusId(it.id)} className={`cursor-pointer text-xs px-2 py-1 rounded ${it.status === 'processed' ? 'bg-sky-600 text-white' : it.status === 'arrived' ? 'bg-amber-500 text-white' : it.status === 'shipped' ? 'bg-blue-600 text-white' : it.status === 'completed' ? 'bg-emerald-700 text-white' : it.status === 'cancelled' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{it.status ?? 'pending'}</div>
                           )}
                         </div>
                       </div>
