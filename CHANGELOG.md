@@ -1,5 +1,25 @@
 # Changelog
 
+
+## 2026-03-14
+
+- Replaced inline table cell editors with a modal-based editor to avoid layout shift and clipping.
+- Added `EditCustomerModal` and wired it into `UsersPage` for editing name, description, rate, and amount.
+- Fixed modal z-index/overlay behavior so inputs can be focused and edited without closing the dialog.
+- Made table headers and recent-orders headers theme-aware (light: `text-zinc-800`, dark: `text-white`).
+- Truncated long names in the table to improve layout and added a hover to show the full name.
+- Rendered status breakdown as vertical lines (one status per line) for clarity in collapsed recent orders.
+- Added TODO: implement amount topup history as the next feature.
+
+
+## 2026-03-13
+
+- Polished the Orders page layout and spacing for improved readability and alignment.
+- Moved the group-level select-all checkbox into a column-aligned header row so it vertically aligns with per-item checkboxes and columns (`Link`, `Price (JPY)`, `Price (IDR)`, `Select`).
+- Updated timeframe filters: renamed "Day" to "This day" and added a `24h` option (plus 2h/4h/6h pills); pill styles now follow light/dark theme.
+- Made the header dropdown (Dashboard / Orders / Customer) theme-aware with a matching background, border, and hover states so long labels remain readable in both themes.
+- Made the customer search dropdown and input on the Orders page follow light/dark backgrounds and borders to avoid visual dilution of long text.
+
 ## 2026-03-12
 
 - Aligned columns in the bulk link import UI so `Price (JPY)`, `Slabbed` checkbox and `Price (IDR)` cells line up correctly in `LinkBulkInput`.
@@ -11,14 +31,6 @@
  - Added `Orders` page: lists server-saved orders grouped by customer/created_at, shows totals, and supports per-row inline-editable status and bulk status updates.
  - Improved Orders filters: searchable customer dropdown and timeframe pill selectors (Any, Today, This week, This month, 2h/4h/6h options).
  - Instrumented diagnostics for update calls that return no rows: when `.update(...).select()` returns empty we now surface a clear message recommending checking Supabase Row Level Security (RLS) or permissions and perform a safe refetch/fallback.
-
-## 2026-03-13
-
-- Polished the Orders page layout and spacing for improved readability and alignment.
-- Moved the group-level select-all checkbox into a column-aligned header row so it vertically aligns with per-item checkboxes and columns (`Link`, `Price (JPY)`, `Price (IDR)`, `Select`).
-- Updated timeframe filters: renamed "Day" to "This day" and added a `24h` option (plus 2h/4h/6h pills); pill styles now follow light/dark theme.
-- Made the header dropdown (Dashboard / Orders / Customer) theme-aware with a matching background, border, and hover states so long labels remain readable in both themes.
-- Made the customer search dropdown and input on the Orders page follow light/dark backgrounds and borders to avoid visual dilution of long text.
 
 ## 2026-03-10
 

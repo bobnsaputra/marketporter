@@ -1,32 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onSave: (data: { id: string; name: string; amount: number; description?: string; rate?: number }) => void;
+  initial: { id: string; name?: string; amount?: number; description?: string; rate?: number };
   isDark?: boolean;
 };
 
-export default function CustomerModal({ open, onClose, onSave, isDark }: Props) {
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [rate, setRate] = useState<string>("130");
+export default function EditCustomerModal({ open, onClose, onSave, initial, isDark }: Props) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [amount, setAmount] = useState(String(initial?.amount ?? 0));
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [rate, setRate] = useState(String(initial?.rate ?? 130));
+
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name ?? "");
+      setAmount(String(initial?.amount ?? 0));
+      setDescription(initial?.description ?? "");
+      setRate(String(initial?.rate ?? 130));
+    }
+  }, [open, initial]);
 
   if (!open) return null;
 
   function handleSave() {
-    if (!name || !amount) return; // require name and amount
-    const id = Date.now().toString(36);
-    const num = Number(amount.toString().replace(/[^0-9.\-]/g, "")) || 0;
+    if (!initial?.id) return;
+    const num = Number(String(amount).replace(/[^0-9.\-]/g, "")) || 0;
     const rateNum = Number(String(rate).replace(/[^0-9.\-]/g, "")) || 130;
-    onSave({ id, name, amount: num, description: description || undefined, rate: rateNum });
-    // reset
-    setName("");
-    setAmount("");
-    setDescription("");
-    setRate("130");
+    onSave({ id: initial.id, name: name || "", amount: num, description: description || undefined, rate: rateNum });
   }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-40" onClick={onClose} />
@@ -35,15 +40,13 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
         role="dialog"
         aria-modal="true"
         className={`relative z-50 w-full max-w-lg mx-auto transform rounded-2xl overflow-hidden transition-all duration-150 ${
-          isDark
-            ? "bg-zinc-900 text-white border border-zinc-800 shadow-2xl"
-            : "bg-white text-zinc-900 border border-zinc-100 shadow-xl"
+          isDark ? "bg-zinc-900 text-white border border-zinc-800 shadow-2xl" : "bg-white text-zinc-900 border border-zinc-100 shadow-xl"
         }`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
           <div>
-            <h3 className="text-lg font-semibold">Add Customer</h3>
-            <p className={`text-sm ${isDark ? 'text-white' : 'text-zinc-900'}`}>Record a transfer quickly</p>
+            <h3 className="text-lg font-semibold">Edit Customer</h3>
+            <p className={`text-sm ${isDark ? 'text-white' : 'text-zinc-900'}`}>Update customer details</p>
           </div>
           <button
             onClick={onClose}
@@ -103,8 +106,6 @@ export default function CustomerModal({ open, onClose, onSave, isDark }: Props) 
                 className={`mt-1 block w-full rounded-lg border border-zinc-200 bg-white/60 dark:bg-transparent px-3 py-2 min-h-[88px] shadow-sm focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-indigo-600 text-white' : 'focus:ring-indigo-200 text-zinc-900'}`}
               />
             </label>
-
-            
           </div>
         </div>
 
