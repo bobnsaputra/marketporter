@@ -7,6 +7,8 @@ import { useEffect, useState, useRef, Fragment } from "react";
 import { useAuth } from "@/context/AuthContext";
 import CustomerModal from "@/components/CustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
+import TopupModal from "@/components/TopupModal";
+import TopupHistory from "@/components/TopupHistory";
 import { supabase } from "@/lib/supabase";
 
 type Customer = { id: string; name: string; amount: number; description?: string; rate?: number; created_at?: string | null; user_id?: string | null };
@@ -33,6 +35,9 @@ export default function UsersPage() {
 	const [editingData, setEditingData] = useState<Partial<Customer> | null>(null);
 	const editingRef = useRef<HTMLTableRowElement | null>(null);
 	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+	const [topupOpen, setTopupOpen] = useState(false);
+	const [topupCustomerId, setTopupCustomerId] = useState<string | null>(null);
+	const [topupRefreshCounter, setTopupRefreshCounter] = useState(0);
 
 	useEffect(() => {
 		async function load() {
@@ -212,17 +217,35 @@ export default function UsersPage() {
 		setEditingData(null);
 	}
 
+	async function handleCreateTopup(payload: { customerId: string; amount: number }) {
+		try {
+			// attempt to insert a topup record; if table/policy prevents insert, gracefully fallback to updating local state
+			const { data, error } = await supabase.from('topups').insert([{ customer_id: payload.customerId, amount: payload.amount, created_at: new Date().toISOString() }]).select();
+			if (error) {
+				console.warn('Failed to insert topup (server):', error);
+			} else {
+				// increment refresh counter so TopupHistory reloads
+				setTopupRefreshCounter((c) => c + 1);
+			}
+			// update local user amount immediately so UI reflects the topup
+			setUsers((s) => s.map((u) => u.id === payload.customerId ? { ...u, amount: Number((u.amount || 0)) + Number(payload.amount) } : u));
+		} catch (err) {
+			console.error('Error creating topup:', err);
+		}
+	}
+
 	// Inline portal editor removed; editing now uses a modal to avoid clipping/overflow issues.
 
 	function badgeFor(status: string) {
+		const base = 'inline-flex items-center gap-2 mr-2 mb-1 px-2.5 py-0.5 rounded-full text-xxs font-semibold tracking-wide shadow-sm';
 		return (
-			status === 'pending' ? `inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono ${isDark ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-200 text-zinc-800'}`
-			: status === 'processed' ? 'inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono bg-sky-600 text-white'
-			: status === 'arrived' ? 'inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono bg-amber-500 text-white'
-			: status === 'shipped' ? 'inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono bg-blue-600 text-white'
-			: status === 'completed' ? 'inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono bg-emerald-700 text-white'
-			: status === 'cancelled' ? 'inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono bg-red-600 text-white'
-			: `inline-block mr-2 mb-1 px-2 py-0.5 rounded text-xxs font-mono ${isDark ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-200 text-zinc-800'}`
+			status === 'pending' ? `${base} ${isDark ? 'bg-zinc-800 text-zinc-100/90' : 'bg-zinc-100 text-zinc-800'}`
+			: status === 'processed' ? `${base} bg-sky-600 text-white` 
+			: status === 'arrived' ? `${base} bg-amber-500 text-white` 
+			: status === 'shipped' ? `${base} bg-blue-600 text-white` 
+			: status === 'completed' ? `${base} bg-emerald-600 text-white` 
+			: status === 'cancelled' ? `${base} bg-red-600 text-white` 
+			: `${base} ${isDark ? 'bg-zinc-800 text-zinc-100/90' : 'bg-zinc-100 text-zinc-800'}`
 		);
 	}
 
@@ -236,15 +259,27 @@ export default function UsersPage() {
 						<div className="flex items-center justify-between">
 							<div className={`${isDark ? "text-sm text-white" : "text-sm text-zinc-900"}`}>Total: {users.length}</div>
 							<div>
-								<button
-									onClick={() => setAdding(true)}
-									className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transform transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-								>
-									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-										<path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-									</svg>
-									Add customer
-								</button>
+								<div className="flex items-center gap-2">
+									<button
+										onClick={() => setAdding(true)}
+										className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transform transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+											<path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+										</svg>
+										Add customer
+									</button>
+
+									<button
+										onClick={() => { setTopupCustomerId(null); setTopupOpen(true); }}
+										className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transform transition hover:-translate-y-0.5 focus:outline-none"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+											<path d="M3 10a7 7 0 1114 0 7 7 0 01-14 0zm8-1V6a1 1 0 10-2 0v3H6a1 1 0 100 2h3v3a1 1 0 102 0v-3h3a1 1 0 100-2h-3z" />
+										</svg>
+										Topup
+									</button>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -284,6 +319,7 @@ export default function UsersPage() {
 											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Amount</th>
 											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Orders</th>
 											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Total IDR</th>
+											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Balance</th>
 											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Last Order</th>
 											<th className={`px-3 py-2 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Status Breakdown</th>
 										</tr>
@@ -301,6 +337,7 @@ export default function UsersPage() {
 												const custOrders = orders.filter(o => o.customer_id === u.id);
 												const totalOrders = custOrders.length;
 												const totalIdr = custOrders.reduce((acc, o) => acc + (Number(o.price_idr) || 0), 0);
+												const balance = (Number(u.amount) || 0) - totalIdr;
 												const lastOrder = custOrders.reduce((latest, o) => (!latest || new Date(o.created_at) > new Date(latest.created_at)) ? o : latest, null as Order | null);
 												const statusCounts: Record<string, number> = {};
 												custOrders.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
@@ -318,13 +355,13 @@ export default function UsersPage() {
 																	<svg className={`w-4 h-4 transition-transform duration-150 ${expanded[u.id] ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 7l3 3-3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
 																</button>
 																<div className={`relative flex-1 ${editing ? (isDark ? 'bg-zinc-900' : 'bg-yellow-50') : ''} rounded`} onClick={() => startEdit(u)}>
-																	<span className="cursor-pointer block max-w-[5ch] overflow-hidden text-ellipsis" title={u.name}>{u.name}</span>
+																	<span className="cursor-pointer block max-w-[20ch] break-words whitespace-normal" title={u.name}>{u.name}</span>
 																</div>
 															</div>
 														</td>
-														<td className={`px-3 py-3 max-w-xs truncate ${isDark ? 'text-xs text-zinc-300' : 'text-xs text-zinc-700'}`} style={{maxWidth:'360px'}}>
+														<td className={`px-3 py-3 max-w-xs ${isDark ? 'text-xs text-zinc-300' : 'text-xs text-zinc-700'}`} style={{maxWidth:'360px'}}>
 															<div className={`relative ${editing ? (isDark ? 'bg-zinc-900' : 'bg-yellow-50') : ''} rounded`} onClick={() => startEdit(u)}>
-																<div className="truncate">{u.description || '—'}</div>
+																<div className="whitespace-normal break-words">{u.description || '—'}</div>
 															</div>
 														</td>
 														<td className={`px-3 py-3 ${isDark ? 'text-sm text-zinc-100' : 'text-sm text-zinc-900'}`}>
@@ -339,6 +376,9 @@ export default function UsersPage() {
 														</td>
 														<td className="px-3 py-3 text-center">{totalOrders}</td>
 														<td className="px-3 py-3 text-right">{totalIdr > 0 ? `Rp ${totalIdr.toLocaleString('id-ID')}` : '—'}</td>
+														<td className={`px-3 py-3 text-right ${balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+															{`Rp ${balance.toLocaleString('id-ID')}`}
+														</td>
 														<td className="px-3 py-3 text-xs">{lastOrder ? formatShort(lastOrder.created_at) : '—'}</td>
 														<td className="px-3 py-3 text-xs">
 															{Object.keys(statusCounts).length === 0 ? '—' : (
@@ -351,55 +391,102 @@ export default function UsersPage() {
 														</td>
 														</tr>
 														{expanded[u.id] && (
-															<tr>
-																<td colSpan={8} className={`px-0 py-0`}>
-																	<div className={`mx-4 my-2 rounded-lg border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-300'} shadow-sm`}>
-																	<div className={`px-4 pt-3 mb-1 text-xs font-semibold ${isDark ? 'text-white' : 'text-zinc-800'}`}>Recent Orders</div>
-																	{custOrders.length === 0 ? (
-																		<div className="px-4 pb-3 text-xs text-zinc-400">No orders for this customer.</div>
-																	) : (
-																		<div className="overflow-x-auto" style={{maxHeight:'260px',overflowY:'auto'}}>
-																			<table className="w-full text-xs">
-																				<thead>
-																					<tr>
-																						<th className={`text-left px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Link</th>
-																						<th className={`text-right px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>JPY</th>
-																						<th className={`text-right px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>IDR</th>
-																						<th className={`text-center px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Status</th>
-																						<th className={`text-center px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Created</th>
-																					</tr>
-																				</thead>
-																				<tbody>
-																					{custOrders
-																						.slice()
-																						.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-																						.map((o) => (
-																							<tr key={o.id}>
-																							<td className="px-2 py-1 truncate max-w-xs"><a href={o.link} className="text-indigo-600 dark:text-indigo-400 underline font-semibold" target="_blank" rel="noopener noreferrer">{o.link}</a></td>
-																								<td className="px-2 py-1 text-right">{o.price_jpy ? `¥${Number(o.price_jpy).toLocaleString('ja-JP')}` : '—'}</td>
-																								<td className="px-2 py-1 text-right">{o.price_idr ? `Rp ${Number(o.price_idr).toLocaleString('id-ID')}` : '—'}</td>
-																								<td className="px-2 py-1 text-center">
-																									<span className={`inline-block px-2 py-0.5 rounded text-xxs font-mono
-																										${o.status === 'pending' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'
-																											: o.status === 'processed' ? 'bg-sky-600 text-white'
-																											: o.status === 'arrived' ? 'bg-amber-500 text-white'
-																											: o.status === 'shipped' ? 'bg-blue-600 text-white'
-																											: o.status === 'completed' ? 'bg-emerald-700 text-white'
-																											: o.status === 'cancelled' ? 'bg-red-600 text-white'
-																											: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'}
-																									`}>{o.status}</span>
-																								</td>
-																								<td className="px-2 py-1 text-center">{formatShort(o.created_at)}</td>
+															<>
+																<tr>
+																	<td colSpan={9} className="px-0 py-0">
+																		<div className={`mx-4 my-2 rounded-lg border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-300'} shadow-sm`}>
+																			<div className="flex items-center justify-between px-4 pt-3 mb-1">
+																				<div className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-zinc-800'}`}>Recent Orders</div>
+																				<div>
+																					<button 
+																						onClick={() => { 
+																							setTopupCustomerId(u.id); 
+																							setTopupOpen(true); 
+																						}} 
+																						className="text-xs px-2 py-1 rounded bg-emerald-600 text-white"
+																					>
+																						Topup
+																					</button>
+																				</div>
+																			</div>
+
+																			{custOrders.length === 0 ? (
+																				<div className="px-4 pb-3 text-xs text-zinc-400">
+																					No orders for this customer.
+																				</div>
+																			) : (
+																				<div className="overflow-x-auto" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+																					<table className="w-full text-xs">
+																						<thead>
+																							<tr>
+																								<th className={`text-left px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Link</th>
+																								<th className={`text-right px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>JPY</th>
+																								<th className={`text-right px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>IDR</th>
+																								<th className={`text-center px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Status</th>
+																								<th className={`text-center px-2 py-1 ${isDark ? 'text-white' : 'text-zinc-800'}`}>Created</th>
 																							</tr>
-																						))}
-																				</tbody>
-																			</table>
+																						</thead>
+																						<tbody>
+																							{custOrders
+																								.slice()
+																								.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+																								.map((o) => (
+																									<tr key={o.id}>
+																										<td className="px-2 py-1 truncate max-w-xs">
+																											<a 
+																												href={o.link} 
+																												className="text-indigo-600 dark:text-indigo-400 underline font-semibold" 
+																												target="_blank" 
+																												rel="noopener noreferrer"
+																											>
+																												{o.link}
+																											</a>
+																										</td>
+																										<td className="px-2 py-1 text-right">
+																											{o.price_jpy ? `¥${Number(o.price_jpy).toLocaleString('ja-JP')}` : '—'}
+																										</td>
+																										<td className="px-2 py-1 text-right">
+																											{o.price_idr ? `Rp ${Number(o.price_idr).toLocaleString('id-ID')}` : '—'}
+																										</td>
+																										<td className="px-2 py-1 text-center">
+																											<span
+																												className={`inline-block px-2 py-0.5 rounded text-xxs font-mono
+																												${o.status === 'pending' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'
+																												: o.status === 'processed' ? 'bg-sky-600 text-white'
+																												: o.status === 'arrived' ? 'bg-amber-500 text-white'
+																												: o.status === 'shipped' ? 'bg-blue-600 text-white'
+																												: o.status === 'completed' ? 'bg-emerald-700 text-white'
+																												: o.status === 'cancelled' ? 'bg-red-600 text-white'
+																												: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'}`}
+																											>
+																												{o.status}
+																											</span>
+																										</td>
+																										<td className="px-2 py-1 text-center">
+																											{formatShort(o.created_at)}
+																										</td>
+																									</tr>
+																								))}
+																						</tbody>
+																					</table>
+																				</div>
+																			)}
 																		</div>
-																		)}
-																	</div>
-																</td>
-															</tr>
-														)}
+																	</td>
+																</tr>
+
+																<tr>
+																	<td colSpan={8} className="px-0 py-0">
+																		<div className={`mx-4 my-2 rounded-lg border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-300'} shadow-sm`}>
+																			<TopupHistory customerId={u.id} isDark={isDark} refreshKey={topupRefreshCounter} onVoided={(topupId, amount) => {
+																				// subtract amount from local customer amount
+																				setUsers((s) => s.map((row) => row.id === u.id ? { ...row, amount: Number((row.amount || 0)) - Number(amount) } : row));
+																			}} />
+																		</div>
+																	</td>
+																</tr>
+															</>
+														)}				
 													</Fragment>
 												);
 											})}
@@ -416,6 +503,15 @@ export default function UsersPage() {
 				onClose={() => setEditingId(null)}
 				initial={{ id: editingId ?? '', name: editingData?.name ?? '', amount: Number(editingData?.amount ?? 0), description: editingData?.description ?? undefined, rate: editingData?.rate ?? undefined }}
 				onSave={handleSaveFromModal}
+				isDark={isDark}
+			/>
+			<TopupModal
+				open={topupOpen}
+				onClose={() => setTopupOpen(false)}
+				customerId={topupCustomerId ?? undefined}
+				customerName={topupCustomerId ? users.find((x) => x.id === topupCustomerId)?.name : undefined}
+				customers={users.map((u) => ({ id: u.id, name: u.name }))}
+				onSave={async ({ customerId, amount }) => { await handleCreateTopup({ customerId, amount }); }}
 				isDark={isDark}
 			/>
 			<CustomerModal open={adding} onClose={() => setAdding(false)} onSave={handleSaveCustomer} isDark={isDark} />
