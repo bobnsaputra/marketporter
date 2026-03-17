@@ -27,7 +27,7 @@ export default function EditCustomerModal({ open, onClose, onSave, initial, isDa
 
   function handleSave() {
     if (!initial?.id) return;
-    const num = Number(String(amount).replace(/[^0-9.\-]/g, "")) || 0;
+    const num = Number(initial?.amount ?? 0) || 0;
     const rateNum = Number(String(rate).replace(/[^0-9.\-]/g, "")) || 130;
     onSave({ id: initial.id, name: name || "", amount: num, description: description || undefined, rate: rateNum });
   }
@@ -44,9 +44,16 @@ export default function EditCustomerModal({ open, onClose, onSave, initial, isDa
         }`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-          <div>
-            <h3 className="text-lg font-semibold">Edit Customer</h3>
-            <p className={`text-sm ${isDark ? 'text-white' : 'text-zinc-900'}`}>Update customer details</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-indigo-50 text-indigo-600">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path d="M3 8a4 4 0 118 0 4 4 0 01-8 0zm9 2a6 6 0 10-5 0v4h5v-4z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Edit Customer</h3>
+              <p className={`text-sm ${isDark ? 'text-white/80' : 'text-zinc-700'}`}>Update customer details</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -81,9 +88,11 @@ export default function EditCustomerModal({ open, onClose, onSave, initial, isDa
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
-                  className={`block w-full rounded-lg border border-zinc-200 bg-white/60 dark:bg-transparent px-10 py-2 shadow-sm focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-indigo-600 text-white' : 'focus:ring-indigo-200 text-zinc-900'}`}
+                  disabled
+                  className={`block w-full rounded-lg border border-zinc-200 bg-white/40 dark:bg-transparent px-10 py-2 shadow-sm text-zinc-500`}
                 />
               </div>
+              <div className="text-xxs text-zinc-400 mt-1">Amount is read-only; topups adjust customer balance.</div>
             </label>
 
             <label className="block">

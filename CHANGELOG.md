@@ -1,6 +1,15 @@
 # Changelog
 
 
+## 2026-03-18
+
+- Added Topups feature: `topups` Supabase migration (`supabase/migrations/004_create_topups.sql`) with indexes, RLS examples, `void_topup` RPC, and an `AFTER INSERT` trigger to update `customers.amount`.
+- Implemented `TopupModal` and `TopupHistory` components; history shows voided entries and supports voiding via RPC.
+- UI improvements: modernized modals, buttons, and status badges; made customer `amount` read-only in the edit modal and added a dedicated topup flow.
+- Added Topup buttons: beside "Add customer" and on the main dashboard search input (opens Topup modal; when no customer selected the modal shows a customer dropdown).
+- Fixed dark-mode styling for dropdowns and inputs; improved placeholder and prefix positioning for `Rp` inside amount inputs.
+
+
 ## 2026-03-14
 
 - Replaced inline table cell editors with a modal-based editor to avoid layout shift and clipping.
