@@ -3,7 +3,7 @@ function formatShort(dt?: string) {
 	if (!dt) return '';
 	try { return new Date(dt).toLocaleString(); } catch { return dt; }
 }
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Fragment } from "react";
 import { useAuth } from "@/context/AuthContext";
 import CustomerModal from "@/components/CustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -134,9 +134,35 @@ export default function UsersPage() {
 		if (editingData.rate !== undefined) payload.rate = Number(editingData.rate) || 130;
 		if (editingData.amount !== undefined) payload.amount = Number(editingData.amount) || 0;
 		try {
-			const { error } = await supabase.from('customers').update(payload).eq('id', editingId);
-			if (error) throw error;
-			setUsers((s) => s.map((row) => (row.id === editingId ? { ...row, ...payload } : row)));
+			const res = await supabase.from('customers').update(payload).eq('id', editingId).select();
+			if (res.error) {
+				console.error('Supabase update error:', res.error, { payload, editingId });
+				window.alert('Failed to save changes: ' + (res.error.message || String(res.error)));
+			} else if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
+				console.warn('Supabase update returned no data', { payload, editingId, res });
+				// diagnostic: fetch the row and auth user to help debug RLS/permission issues
+				try {
+					const sel = await supabase.from('customers').select('*').eq('id', editingId);
+					console.info('Diagnostic select after empty update:', sel);
+					const authRes = await supabase.auth.getUser();
+					console.info('Supabase auth.getUser():', authRes);
+				} catch (diagErr) {
+					console.error('Diagnostic query failed:', diagErr);
+				}
+				window.alert('Update did not return an updated row. Check RLS/permissions.');
+				setUsers((s) => s.map((row) => (row.id === editingId ? { ...row, ...payload } : row)));
+			} else if (Array.isArray(res.data)) {
+				if (res.data.length === 1) {
+					setUsers((s) => s.map((r) => (r.id === editingId ? (res.data[0] as Customer) : r)));
+				} else {
+					console.warn('Supabase update returned multiple rows for id', { editingId, rows: res.data });
+					// fallback: merge payload
+					setUsers((s) => s.map((row) => (row.id === editingId ? { ...row, ...payload } : row)));
+				}
+			} else {
+				const row = Array.isArray(res.data) ? (res.data[0] as Customer) : (res.data as Customer);
+				if (row) setUsers((s) => s.map((r) => (r.id === editingId ? row : r)));
+			}
 		} catch (err) {
 			console.error('Failed to save customer edit:', err);
 		}
@@ -151,9 +177,34 @@ export default function UsersPage() {
 		if (data.rate !== undefined) payload.rate = Number(data.rate) || 130;
 		if (data.amount !== undefined) payload.amount = Number(data.amount) || 0;
 		try {
-			const { error } = await supabase.from('customers').update(payload).eq('id', data.id);
-			if (error) throw error;
-			setUsers((s) => s.map((row) => (row.id === data.id ? { ...row, ...payload } : row)));
+			const res = await supabase.from('customers').update(payload).eq('id', data.id).select();
+			if (res.error) {
+				console.error('Supabase update error (modal):', res.error, { payload, id: data.id });
+				window.alert('Failed to save changes: ' + (res.error.message || String(res.error)));
+			} else if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
+				console.warn('Supabase update returned no data (modal)', { payload, id: data.id, res });
+				// diagnostic: fetch the row and auth user to help debug RLS/permission issues
+				try {
+					const sel = await supabase.from('customers').select('*').eq('id', data.id);
+					console.info('Diagnostic select after empty update (modal):', sel);
+					const authRes = await supabase.auth.getUser();
+					console.info('Supabase auth.getUser() (modal):', authRes);
+				} catch (diagErr) {
+					console.error('Diagnostic query failed (modal):', diagErr);
+				}
+				window.alert('Update did not return an updated row. Check RLS/permissions.');
+				setUsers((s) => s.map((row) => (row.id === data.id ? { ...row, ...payload } : row)));
+			} else if (Array.isArray(res.data)) {
+				if (res.data.length === 1) {
+					setUsers((s) => s.map((r) => (r.id === data.id ? (res.data[0] as Customer) : r)));
+				} else {
+					console.warn('Supabase update returned multiple rows for id (modal)', { id: data.id, rows: res.data });
+					setUsers((s) => s.map((row) => (row.id === data.id ? { ...row, ...payload } : row)));
+				}
+			} else {
+				const row = Array.isArray(res.data) ? (res.data[0] as Customer) : (res.data as Customer);
+				if (row) setUsers((s) => s.map((r) => (r.id === data.id ? row : r)));
+			}
 		} catch (err) {
 			console.error('Failed to save customer from modal:', err);
 		}
@@ -254,8 +305,8 @@ export default function UsersPage() {
 												const statusCounts: Record<string, number> = {};
 												custOrders.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
 										return (
-											<>
-												<tr key={u.id} ref={editing ? editingRef : null} className="align-top">
+											<Fragment key={u.id}>
+												<tr ref={editing ? editingRef : null} className="align-top">
 														<td className={`px-3 py-3 ${isDark ? 'text-sm text-zinc-100 font-semibold' : 'text-sm text-zinc-900 font-semibold'}`}>
 															<div className="flex items-center gap-2">
 																<button
@@ -349,7 +400,7 @@ export default function UsersPage() {
 																</td>
 															</tr>
 														)}
-													</>
+													</Fragment>
 												);
 											})}
 									</tbody>
