@@ -117,7 +117,11 @@ export default function OrdersPage() {
   const keys = Object.keys(groups).sort((a, b) => (groups[b]?.[0]?.created_at ?? '').localeCompare(groups[a]?.[0]?.created_at ?? ''));
 
   return (
-    <div className="mt-6 max-w-4xl mx-auto">
+    <div className="mt-6 max-w-4xl mx-auto" style={{ caretColor: 'transparent' }} onMouseDown={(e) => {
+      const tgt = e.target as HTMLElement;
+      if (tgt && (tgt.tagName.toLowerCase() === 'input' || tgt.tagName.toLowerCase() === 'textarea' || tgt.tagName.toLowerCase() === 'select')) return;
+      if (e.target === e.currentTarget) e.preventDefault();
+    }}>
       <h3 className="text-lg font-medium">Orders</h3>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">List of orders based on filter.</p>
 
@@ -178,22 +182,31 @@ export default function OrdersPage() {
                   <option value="cancelled">cancelled</option>
                 </select>
                 <button
+                  type="button"
+                  disabled={loading}
+                  aria-busy={loading}
                   onClick={async () => {
+                    if (loading) return;
                     const ids = Object.keys(selectedIds).filter((k) => selectedIds[k]);
                     if (ids.length === 0) return;
                     try {
                       setLoading(true);
                       const idsArr = ids.map(String);
-                      const { data: updatedRows, error: upErr } = await supabase.from('orders').update({ status: bulkStatus }).in('id', idsArr).select();
-                      if (upErr) throw upErr;
-                      // update local state using returned rows when available; fall back to ids if none returned
-                      const updatedIdSet = new Set(((updatedRows && Array.isArray(updatedRows) && updatedRows.length > 0) ? updatedRows.map((r: any) => String(r.id)) : idsArr).map(String));
-                      // if supabase returned zero rows and there was no error, warn the user (possible RLS/permission)
-                      if ((!updatedRows || (Array.isArray(updatedRows) && updatedRows.length === 0))) {
+                      const chunkSize = 100; // avoid sending too large IN() lists
+                      const returnedIds: string[] = [];
+                      for (let i = 0; i < idsArr.length; i += chunkSize) {
+                        const chunk = idsArr.slice(i, i + chunkSize);
+                        const { data: updatedRows, error: upErr } = await supabase.from('orders').update({ status: bulkStatus }).in('id', chunk).select();
+                        if (upErr) throw upErr;
+                        if (updatedRows && Array.isArray(updatedRows)) returnedIds.push(...updatedRows.map((r: any) => String(r.id)));
+                      }
+                      // if no returned ids, warn the user (possible RLS/permission)
+                      if (returnedIds.length === 0) {
                         const msg = `Update completed but returned no rows for ids: ${idsArr.join(', ')}. This may be due to Row Level Security or insufficient permissions; refresh may not show changes.`;
                         console.warn(msg);
                         setError(msg);
                       }
+                      const updatedIdSet = new Set((returnedIds.length > 0 ? returnedIds : idsArr).map(String));
                       setGroups((prev) => {
                         const out: Record<string, any[]> = {};
                         Object.entries(prev).forEach(([gk, arr]) => {
@@ -207,8 +220,9 @@ export default function OrdersPage() {
                       setError(String(e?.message || e?.details || e));
                     } finally { setLoading(false); }
                   }}
-                  className="px-3 py-1 rounded bg-indigo-600 text-white text-sm"
-                >Set status</button>
+                  className={`px-3 py-1 rounded text-sm ${loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 text-white'}`}>
+                  {loading ? 'Setting…' : 'Set status'}
+                </button>
               </>
             )}
           </div>

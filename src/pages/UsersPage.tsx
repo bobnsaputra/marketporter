@@ -308,8 +308,8 @@ export default function UsersPage() {
 							<div className="text-center py-8">
 								<div className={`${isDark ? "text-sm text-white" : "text-sm text-zinc-500"}`}>No customers yet. Imported customers will appear here.</div>
 							</div>
-							) : (
-								<div className="overflow-auto w-full">
+                            ) : (
+                            	<div className="overflow-auto w-full" style={{ caretColor: 'transparent' }} onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}>
 								<table className="w-full min-w-[1000px] text-sm table-auto">
 									<thead>
 										<tr className="text-left text-xs">
@@ -476,8 +476,8 @@ export default function UsersPage() {
 																</tr>
 
 																<tr>
-																	<td colSpan={8} className="px-0 py-0">
-																		<div className={`mx-4 my-2 rounded-lg border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-300'} shadow-sm`}>
+																	<td colSpan={9} className="px-0 py-0">
+																		<div className={`mx-auto my-2 p-2 max-w-[1480px] rounded-lg border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-300'} shadow-sm`}>
 																			<TopupHistory customerId={u.id} isDark={isDark} refreshKey={topupRefreshCounter} onVoided={(topupId, amount) => {
 																				// subtract amount from local customer amount
 																				setUsers((s) => s.map((row) => row.id === u.id ? { ...row, amount: Number((row.amount || 0)) - Number(amount) } : row));

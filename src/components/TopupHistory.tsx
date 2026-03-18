@@ -46,7 +46,7 @@ export default function TopupHistory({ customerId, isDark, onVoided, refreshKey 
 
   return (
     <div className={`px-4 pb-3 text-xs ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 mt-2">
         <div className="font-medium">Topup History</div>
         <div className="text-xs text-zinc-500">{loading ? 'Loading…' : `${rows.length} entries`}</div>
       </div>
@@ -57,7 +57,7 @@ export default function TopupHistory({ customerId, isDark, onVoided, refreshKey 
         <div style={{ maxHeight: 220, overflowY: 'auto' }} className="space-y-1">
           <ul className="space-y-1">
             {rows.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3">
+              <li key={r.id} className="flex items-center justify-between gap-3 mb-1">
                 <div className="flex-1">
                   <div className="truncate">{r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</div>
                   {r.voided && r.void_reason ? <div className="text-xxs text-red-500">Voided: {r.void_reason}</div> : null}

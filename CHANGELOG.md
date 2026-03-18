@@ -1,6 +1,14 @@
 # Changelog
 
 
+## 2026-03-19
+
+- UI: added `Balance` column on `UsersPage` (computed `amount - total IDR`) with color-coded positive/negative styling.
+- Layout: adjusted customers table/container sizing (table `min-w` tweaks and container width changes) so the table can expand and scroll cleanly.
+- Topup UI: increased padding for the expanded "Recent Orders" header, added breathing room around the `TopupHistory` section, and aligned the history table to match the customers table width.
+- Minor: various spacing and wrapper width tweaks to keep Topup history readable across light/dark themes.
+
+
 ## 2026-03-18
 
 - Added Topups feature: `topups` Supabase migration (`supabase/migrations/004_create_topups.sql`) with indexes, RLS examples, `void_topup` RPC, and an `AFTER INSERT` trigger to update `customers.amount`.

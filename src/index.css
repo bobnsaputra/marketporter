@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+/* Prevent blinking text caret on non-editable elements (labels, divs) when clicked. */
+*:not(input):not(textarea):not(select):not([contenteditable="true"]) {
+	caret-color: transparent;
+}
+
+/* Keep focus outlines for accessibility but avoid showing a caret. */
