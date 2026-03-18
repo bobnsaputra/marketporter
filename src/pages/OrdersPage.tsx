@@ -17,9 +17,10 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
-  const [bulkStatus, setBulkStatus] = useState<string>('processed');
   const [isDark, setIsDark] = useState(false);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
+  const [showBulkMenu, setShowBulkMenu] = useState<boolean>(false);
 
   useEffect(() => {
     function update() {
@@ -116,6 +117,43 @@ export default function OrdersPage() {
 
   const keys = Object.keys(groups).sort((a, b) => (groups[b]?.[0]?.created_at ?? '').localeCompare(groups[a]?.[0]?.created_at ?? ''));
 
+  async function applyBulkStatus(newStatus: string) {
+    if (loading) return;
+    const ids = Object.keys(selectedIds).filter((k) => selectedIds[k]);
+    if (ids.length === 0) return;
+    try {
+      setLoading(true);
+      const idsArr = ids.map(String);
+      const chunkSize = 100;
+      const returnedIds: string[] = [];
+      for (let i = 0; i < idsArr.length; i += chunkSize) {
+        const chunk = idsArr.slice(i, i + chunkSize);
+        const { data: updatedRows, error: upErr } = await supabase.from('orders').update({ status: newStatus }).in('id', chunk).select();
+        if (upErr) throw upErr;
+        if (updatedRows && Array.isArray(updatedRows)) returnedIds.push(...updatedRows.map((r: any) => String(r.id)));
+      }
+      if (returnedIds.length === 0) {
+        const msg = `Update completed but returned no rows for ids: ${idsArr.join(', ')}. This may be due to Row Level Security or insufficient permissions; refresh may not show changes.`;
+        console.warn(msg);
+        setError(msg);
+      }
+      const updatedIdSet = new Set((returnedIds.length > 0 ? returnedIds : idsArr).map(String));
+      setGroups((prev) => {
+        const out: Record<string, any[]> = {};
+        Object.entries(prev).forEach(([gk, arr]) => {
+          out[gk] = arr.map((r) => updatedIdSet.has(String(r.id)) ? { ...r, status: newStatus } : r);
+        });
+        return out;
+      });
+      setSelectedIds({});
+    } catch (e: any) {
+      console.error('Bulk status update failed', e);
+      setError(String(e?.message || e?.details || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="mt-6 max-w-4xl mx-auto" style={{ caretColor: 'transparent' }} onMouseDown={(e) => {
       const tgt = e.target as HTMLElement;
@@ -170,60 +208,20 @@ export default function OrdersPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             {Object.keys(selectedIds).filter((k) => selectedIds[k]).length > 0 && (
-              <>
-                <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="text-sm rounded border px-2 py-1">
-                  <option value="pending">pending</option>
-                  <option value="processed">processed</option>
-                  <option value="arrived">arrived</option>
-                  <option value="shipped">shipped</option>
-                  <option value="completed">completed</option>
-                  <option value="cancelled">cancelled</option>
-                </select>
-                <button
-                  type="button"
-                  disabled={loading}
-                  aria-busy={loading}
-                  onClick={async () => {
-                    if (loading) return;
-                    const ids = Object.keys(selectedIds).filter((k) => selectedIds[k]);
-                    if (ids.length === 0) return;
-                    try {
-                      setLoading(true);
-                      const idsArr = ids.map(String);
-                      const chunkSize = 100; // avoid sending too large IN() lists
-                      const returnedIds: string[] = [];
-                      for (let i = 0; i < idsArr.length; i += chunkSize) {
-                        const chunk = idsArr.slice(i, i + chunkSize);
-                        const { data: updatedRows, error: upErr } = await supabase.from('orders').update({ status: bulkStatus }).in('id', chunk).select();
-                        if (upErr) throw upErr;
-                        if (updatedRows && Array.isArray(updatedRows)) returnedIds.push(...updatedRows.map((r: any) => String(r.id)));
-                      }
-                      // if no returned ids, warn the user (possible RLS/permission)
-                      if (returnedIds.length === 0) {
-                        const msg = `Update completed but returned no rows for ids: ${idsArr.join(', ')}. This may be due to Row Level Security or insufficient permissions; refresh may not show changes.`;
-                        console.warn(msg);
-                        setError(msg);
-                      }
-                      const updatedIdSet = new Set((returnedIds.length > 0 ? returnedIds : idsArr).map(String));
-                      setGroups((prev) => {
-                        const out: Record<string, any[]> = {};
-                        Object.entries(prev).forEach(([gk, arr]) => {
-                          out[gk] = arr.map((r) => updatedIdSet.has(String(r.id)) ? { ...r, status: bulkStatus } : r);
-                        });
-                        return out;
-                      });
-                      setSelectedIds({});
-                    } catch (e: any) {
-                      console.error('Bulk status update failed', e);
-                      setError(String(e?.message || e?.details || e));
-                    } finally { setLoading(false); }
-                  }}
-                  className={`px-3 py-1 rounded text-sm ${loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 text-white'}`}>
-                  {loading ? 'Setting…' : 'Set status'}
+              <div className="relative">
+                <button type="button" onClick={() => setShowBulkMenu((s) => !s)} disabled={loading} className={`px-3 py-1 rounded text-sm ${loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 text-white'}`}>
+                  {loading ? 'Setting…' : `Apply status (${Object.keys(selectedIds).filter((k) => selectedIds[k]).length})`}
                 </button>
-              </>
+                {showBulkMenu && (
+                  <div className={`absolute right-0 mt-2 z-40 w-44 rounded shadow-lg ${isDark ? 'bg-zinc-900 text-white border border-zinc-700' : 'bg-white text-zinc-900 border border-zinc-100'}`}>
+                    {['pending','processed','arrived','shipped','completed','cancelled'].map((s) => (
+                      <div key={s} onMouseDown={async (e) => { e.preventDefault(); setShowBulkMenu(false); await applyBulkStatus(s); }} className={`px-3 py-2 cursor-pointer hover:${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>{s}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -274,7 +272,6 @@ export default function OrdersPage() {
                                 setLoading(true);
                                 const { data: upd, error: upErr } = await supabase.from('orders').update({ status: newStatus }).eq('id', it.id).select();
                                 if (upErr) throw upErr;
-                                // use returned row if available
                                 const updatedId = (upd && Array.isArray(upd) && upd[0]?.id) ? String(upd[0].id) : String(it.id);
                                 if (!upd || (Array.isArray(upd) && upd.length === 0)) {
                                   const msg = `Update completed but returned no rows for id: ${it.id}. This may be due to Row Level Security or insufficient permissions.`;
@@ -300,7 +297,16 @@ export default function OrdersPage() {
                               <option value="cancelled">cancelled</option>
                             </select>
                           ) : (
-                            <div onClick={() => setEditingStatusId(it.id)} className={`cursor-pointer text-xs px-2 py-1 rounded ${it.status === 'processed' ? 'bg-sky-600 text-white' : it.status === 'arrived' ? 'bg-amber-500 text-white' : it.status === 'shipped' ? 'bg-blue-600 text-white' : it.status === 'completed' ? 'bg-emerald-700 text-white' : it.status === 'cancelled' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{it.status ?? 'pending'}</div>
+                            <div className="relative inline-block">
+                              <button type="button" onClick={() => setOpenStatusMenuId(openStatusMenuId === it.id ? null : it.id)} className={`cursor-pointer text-xs px-2 py-1 rounded ${it.status === 'processed' ? 'bg-sky-600 text-white' : it.status === 'arrived' ? 'bg-amber-500 text-white' : it.status === 'shipped' ? 'bg-blue-600 text-white' : it.status === 'completed' ? 'bg-emerald-700 text-white' : it.status === 'cancelled' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{it.status ?? 'pending'}</button>
+                              {openStatusMenuId === it.id && (
+                                <div className={`absolute right-0 mt-1 z-40 w-36 rounded shadow-lg ${isDark ? 'bg-zinc-900 text-white border border-zinc-700' : 'bg-white text-zinc-900 border border-zinc-100'}`}>
+                                  {['pending','processed','arrived','shipped','completed','cancelled'].map((s) => (
+                                    <div key={s} onMouseDown={async (e) => { e.preventDefault(); setOpenStatusMenuId(null); try { setLoading(true); const { data: upd, error: upErr } = await supabase.from('orders').update({ status: s }).eq('id', it.id).select(); if (upErr) throw upErr; const updatedId = (upd && Array.isArray(upd) && upd[0]?.id) ? String(upd[0].id) : String(it.id); setGroups((prev) => { const out: Record<string, any[]> = {}; Object.entries(prev).forEach(([gk, arr]) => { out[gk] = arr.map((r) => String(r.id) === updatedId ? { ...r, status: s } : r); }); return out; }); } catch (err:any) { console.error('Failed to update status', err); setError(String(err?.message || err?.details || err)); } finally { setLoading(false); } }} className={`px-3 py-2 cursor-pointer hover:${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>{s}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
